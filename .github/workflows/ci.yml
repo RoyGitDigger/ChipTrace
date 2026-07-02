@@ -1,0 +1,56 @@
+name: chiptrace-ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y verilator gtkwave
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run cocotb testbench
+        working-directory: tb
+        run: make SIM=verilator
+
+      - name: Generate coverage + analysis report
+        if: always()
+        run: |
+          python chiptrace_tool/report_gen.py \
+            --vcd tb/dump.vcd \
+            --log tb/uart.log \
+            --coverage tb/coverage.yml \
+            --out report.html \
+            --window-ns 10
+
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: report.html
+
+      - name: Upload waveform
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: waveform-dump
+          path: tb/dump.vcd

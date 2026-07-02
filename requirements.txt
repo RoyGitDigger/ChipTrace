@@ -1,0 +1,6 @@
+cocotb>=1.9.0
+cocotb-bus>=0.2.1
+cocotb-coverage>=1.1.0
+vcdvcd>=2.0.0
+pytest>=7.4.0
+pyyaml>=6.0

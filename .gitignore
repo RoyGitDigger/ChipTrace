@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+sim_build/
+results.xml
+dump.vcd
+dump.fst
+coverage.yml
+report.html
+*.vcd
+*.fst
+*.log
