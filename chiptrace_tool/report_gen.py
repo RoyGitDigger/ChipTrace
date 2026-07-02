@@ -349,7 +349,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="ChipTrace — generate HTML failure analysis report"
     )
-    parser.add_argument("--vcd",       required=True,  help="Path to VCD waveform dump")
+    parser.add_argument("--vcd",       default=None,   help="Path to VCD waveform dump (optional)")
     parser.add_argument("--log",       default=None,   help="Path to firmware/bus log")
     parser.add_argument("--coverage",  default=None,   help="Path to coverage.yml")
     parser.add_argument("--out",       default="report.html", help="Output HTML path")
@@ -357,15 +357,25 @@ def main():
                         help="Temporal clustering window in ns (default 10)")
     args = parser.parse_args()
 
-    print(f"[chiptrace] Loading waveform: {args.vcd}")
-    events = load_events(args.vcd)
-    print(f"[chiptrace] {len(events)} signal change events loaded")
+    events = []
+    if args.vcd:
+        if os.path.exists(args.vcd):
+            print(f"[chiptrace] Loading waveform: {args.vcd}")
+            events = load_events(args.vcd)
+            print(f"[chiptrace] {len(events)} signal change events loaded")
+        else:
+            print(f"[chiptrace] WARNING: VCD file not found ({args.vcd}), generating report without waveform data")
+    else:
+        print("[chiptrace] No VCD provided, skipping waveform analysis")
 
     log_entries = []
     if args.log:
-        print(f"[chiptrace] Loading log: {args.log}")
-        log_entries = parse_log(args.log)
-        print(f"[chiptrace] {len(log_entries)} log entries parsed")
+        if os.path.exists(args.log):
+            print(f"[chiptrace] Loading log: {args.log}")
+            log_entries = parse_log(args.log)
+            print(f"[chiptrace] {len(log_entries)} log entries parsed")
+        else:
+            print(f"[chiptrace] WARNING: log file not found ({args.log}), skipping")
 
     annotated = merge_with_log(events, log_entries, window_ns=args.window_ns)
     print(f"[chiptrace] {len(annotated)} causal clusters flagged")
@@ -380,7 +390,7 @@ def main():
         coverage_data=coverage_data,
         out_path=args.out,
         run_meta={
-            "vcd":       args.vcd,
+            "vcd":       args.vcd or "—",
             "log":       args.log or "—",
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }

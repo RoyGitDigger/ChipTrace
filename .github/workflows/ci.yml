@@ -34,9 +34,13 @@ jobs:
       - name: Generate coverage + analysis report
         if: always()
         run: |
+          VCD_ARG=""
+          [ -f tb/dump.vcd ] && VCD_ARG="--vcd tb/dump.vcd"
+          LOG_ARG=""
+          [ -f tb/uart.log ] && LOG_ARG="--log tb/uart.log"
           python -m chiptrace_tool.report_gen \
-            --vcd tb/dump.vcd \
-            --log tb/uart.log \
+            $VCD_ARG \
+            $LOG_ARG \
             --coverage tb/coverage.yml \
             --out report.html \
             --window-ns 10
