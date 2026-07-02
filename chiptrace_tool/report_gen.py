@@ -4,9 +4,15 @@ import sys
 import yaml
 from datetime import datetime
 
-from wave_parser import load_events
-from log_parser import parse_log
-from causal_reconstructor import merge_with_log, CausalCluster
+try:
+    from chiptrace_tool.wave_parser import load_events
+    from chiptrace_tool.log_parser import parse_log
+    from chiptrace_tool.causal_reconstructor import merge_with_log, CausalCluster
+except ImportError:
+    from wave_parser import load_events
+    from log_parser import parse_log
+    from causal_reconstructor import merge_with_log, CausalCluster
+
 
 
 _HAZARD_COLOR = {

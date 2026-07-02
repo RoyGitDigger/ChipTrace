@@ -1,5 +1,6 @@
 from cocotb_coverage.coverage import CoverPoint, CoverCross, coverage_db
 import yaml
+import atexit
 
 
 def _burst_len_bin(txn):
@@ -32,15 +33,11 @@ def _uart_class(txn):
     bins=[False, True],
     bins_labels=["nominal", "reset_injected"]
 )
-def sample_spi_txn(txn):
-    pass
-
-
 @CoverCross(
     "top.cross_burst_reset",
     items=["top.spi_burst_len", "top.reset_during_txn"]
 )
-def _cross_dummy():
+def sample_spi_txn(txn):
     pass
 
 
@@ -56,3 +53,14 @@ def sample_uart_txn(txn):
 def harvest(out_path="coverage.yml"):
     with open(out_path, "w") as f:
         yaml.dump(coverage_db, f, default_flow_style=False)
+
+
+# Auto-save coverage database on clean simulation exit
+def _save_at_exit():
+    try:
+        harvest("coverage.yml")
+    except Exception:
+        pass
+
+
+atexit.register(_save_at_exit)

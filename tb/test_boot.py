@@ -1,5 +1,5 @@
 import cocotb
-from cocotb.triggers import RisingEdge, Timer
+from cocotb.triggers import RisingEdge
 
 import sys
 import os
@@ -7,15 +7,8 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from sim_utils import start_clock, reset_dut, sim_time_ns
 from agents.cpu_monitor import CpuMonitor
-from agents.spi_agent import SpiFlashModel, SpiMonitor
-
-
-GOLDEN_FLASH = bytes([
-    0x6F, 0x00, 0x00, 0x00,  # JAL x0,0  (reset vector, loops forever)
-    *range(4, 256)
-])
-
-PICOSOC_BOOT_ADDR = 0x00100000  # reset vector in SRAM where picosoc starts
+from agents.spi_agent import SpiFlashModel
+from conftest import GOLDEN_FLASH
 
 
 @cocotb.test()

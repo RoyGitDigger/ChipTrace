@@ -1,14 +1,6 @@
 from dataclasses import dataclass, field
-from typing import Optional
-
-
-@dataclass
-class SpiTransaction:
-    addr: int
-    data: bytes
-    timestamp_ns: float
-    burst_len: int
-    reset_asserted: bool = False
+from typing import Optional, List
+from agents.spi_agent import SpiTransaction
 
 
 @dataclass

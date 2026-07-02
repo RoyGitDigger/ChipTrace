@@ -1,7 +1,7 @@
 import cocotb
-from cocotb.triggers import RisingEdge, FallingEdge, Edge, Timer
+from cocotb.triggers import RisingEdge, FallingEdge
 from cocotb.queue import Queue
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List
 
 
@@ -24,12 +24,9 @@ class SpiFlashModel:
     spimemio.v issues when the CPU fetches from the 0x01000000 range.
 
     Protocol handled:
-        - Standard SPI mode (single-lane) for command byte and address
-        - Quad-IO read (0xEB): command on IO0, address on all 4 bits,
-          4 dummy cycles, then data clocked out on all 4 lines
-
-    The model drives flash_io lines through the tristate bus in top_tb.v
-    so the DUT sees real signal levels.
+        - Standard SPI mode (single-lane) for command byte on flash_io_do[0]
+        - Quad-IO read (0xEB): address on all 4 bits, Mode byte (2 clocks),
+          8 dummy cycles, then data clocked out on flash_io_di[3:0]
     """
 
     def __init__(self, dut, flash_image: bytes):
@@ -43,6 +40,7 @@ class SpiFlashModel:
 
     def start(self):
         self._running = True
+        self.dut.flash_io_di.value = 0
         cocotb.start_soon(self._serve())
 
     def stop(self):
@@ -55,57 +53,87 @@ class SpiFlashModel:
 
     async def _handle_transaction(self):
         t0 = cocotb.utils.get_sim_time("ns")
-        cmd = await self._rx_byte_single()
+        try:
+            cmd = await self._rx_byte_single()
+            if int(self.dut.flash_csb.value) == 1:
+                return
 
-        if cmd == 0xEB:
-            addr = await self._rx_addr_quad()
-            # 4 dummy cycles
-            for _ in range(4):
-                await RisingEdge(self.dut.flash_clk)
+            if cmd == 0xEB:
+                addr = await self._rx_addr_quad()
+                if int(self.dut.flash_csb.value) == 1:
+                    return
 
-            data_bytes = []
-            while int(self.dut.flash_csb.value) == 0:
-                b = await self._tx_byte_quad(self._image[addr % len(self._image)])
-                data_bytes.append(b)
-                addr += 1
+                # Read Mode byte (2 nibbles = 2 clocks in QSPI)
+                mode = 0
+                for _ in range(2):
+                    await RisingEdge(self.dut.flash_clk)
+                    if int(self.dut.flash_csb.value) == 1:
+                        return
+                    nibble = int(self.dut.flash_io_do.value) & 0xF
+                    mode = (mode << 4) | nibble
 
-            txn = SpiTransaction(
-                cmd=cmd,
-                addr=addr - len(data_bytes),
-                data=data_bytes,
-                timestamp_ns=t0
-            )
-            await self.tx_queue.put(txn)
-        else:
-            # unknown command — just drain until CS goes high
-            while int(self.dut.flash_csb.value) == 0:
-                await RisingEdge(self.dut.flash_clk)
+                # 8 dummy cycles (default config_dummy = 8)
+                for _ in range(8):
+                    await RisingEdge(self.dut.flash_clk)
+                    if int(self.dut.flash_csb.value) == 1:
+                        return
+
+                data_bytes = []
+                while int(self.dut.flash_csb.value) == 0:
+                    b = await self._tx_byte_quad(self._image[addr % len(self._image)])
+                    if int(self.dut.flash_csb.value) == 1:
+                        break
+                    data_bytes.append(b)
+                    addr += 1
+
+                if data_bytes:
+                    txn = SpiTransaction(
+                        cmd=cmd,
+                        addr=addr - len(data_bytes),
+                        data=data_bytes,
+                        timestamp_ns=t0
+                    )
+                    await self.tx_queue.put(txn)
+            else:
+                while int(self.dut.flash_csb.value) == 0:
+                    await RisingEdge(self.dut.flash_clk)
+        finally:
+            self.dut.flash_io_di.value = 0
 
     async def _rx_byte_single(self):
         val = 0
         for i in range(7, -1, -1):
             await RisingEdge(self.dut.flash_clk)
-            bit = int(self.dut.flash_io[0].value)
+            if int(self.dut.flash_csb.value) == 1:
+                return 0
+            bit = int(self.dut.flash_io_do[0].value)
             val |= (bit << i)
         return val
 
     async def _rx_addr_quad(self):
-        # 24-bit address, 4 bits per clock (6 clocks)
         addr = 0
         for i in range(5, -1, -1):
             await RisingEdge(self.dut.flash_clk)
-            nibble = int(self.dut.flash_io.value) & 0xF
+            if int(self.dut.flash_csb.value) == 1:
+                return 0
+            nibble = int(self.dut.flash_io_do.value) & 0xF
             addr |= (nibble << (i * 4))
         return addr
 
     async def _tx_byte_quad(self, byte_val: int):
-        # Drive two nibbles out on IO[3:0] on falling edges
         hi_nibble = (byte_val >> 4) & 0xF
         lo_nibble = byte_val & 0xF
+
         await FallingEdge(self.dut.flash_clk)
-        self.dut.flash_io.value = hi_nibble
+        if int(self.dut.flash_csb.value) == 1:
+            return byte_val
+        self.dut.flash_io_di.value = hi_nibble
+
         await FallingEdge(self.dut.flash_clk)
-        self.dut.flash_io.value = lo_nibble
+        if int(self.dut.flash_csb.value) == 1:
+            return byte_val
+        self.dut.flash_io_di.value = lo_nibble
+
         return byte_val
 
 

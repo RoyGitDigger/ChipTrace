@@ -1,6 +1,5 @@
 import pytest
-import cocotb
-from coverage import harvest
+import os
 
 
 # Synthetic 256-byte flash image used across all tests.
@@ -19,16 +18,19 @@ def _build_flash_image():
     return bytes(img)
 
 
-GOLDEN_FLASH_IMAGE = _build_flash_image()
+GOLDEN_FLASH = _build_flash_image()
 
 
 @pytest.fixture(scope="session")
 def golden_flash():
-    return GOLDEN_FLASH_IMAGE
+    return GOLDEN_FLASH
 
 
 def pytest_sessionfinish(session, exitstatus):
+    # Lazy load cocotb to avoid crash on pytest --collect-only
     try:
+        import cocotb
+        from coverage import harvest
         harvest("coverage.yml")
     except Exception:
         pass

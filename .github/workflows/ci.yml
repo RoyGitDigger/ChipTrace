@@ -34,7 +34,7 @@ jobs:
       - name: Generate coverage + analysis report
         if: always()
         run: |
-          python chiptrace_tool/report_gen.py \
+          python -m chiptrace_tool.report_gen \
             --vcd tb/dump.vcd \
             --log tb/uart.log \
             --coverage tb/coverage.yml \

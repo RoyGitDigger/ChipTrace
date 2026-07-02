@@ -1,27 +1,19 @@
 import cocotb
-from cocotb.triggers import RisingEdge, Timer
+from cocotb.triggers import Timer
 
 import sys
 import os
 sys.path.insert(0, os.path.dirname(__file__))
 
-from sim_utils import start_clock, reset_dut, wait_n_cycles, sim_time_ns
+from sim_utils import start_clock, reset_dut, wait_n_cycles
 from agents.uart_agent import UartDriver, UartMonitor
 from agents.spi_agent import SpiFlashModel
 from agents.cpu_monitor import CpuMonitor
 from scoreboard import Scoreboard, UartTransaction
 from coverage import sample_uart_txn
+from conftest import GOLDEN_FLASH
 
 
-GOLDEN_FLASH = bytes([
-    0x6F, 0x00, 0x00, 0x00,
-    *range(4, 256)
-])
-
-# Bytes we'll drive into ser_rx and expect to see echoed/acknowledged on ser_tx.
-# With a minimal firmware image the SOC won't actually echo — instead we verify
-# the UART MMIO transaction appears on the CPU bus.  The UartMonitor watches
-# ser_tx for any transmission the DUT itself initiates.
 TEST_SEQUENCE = [0x41, 0x42, 0x43]  # "ABC"
 
 

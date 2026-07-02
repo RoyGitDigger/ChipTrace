@@ -1,21 +1,16 @@
 import cocotb
-from cocotb.triggers import RisingEdge, Timer
+from cocotb.triggers import Timer
 
 import sys
 import os
 sys.path.insert(0, os.path.dirname(__file__))
 
-from sim_utils import start_clock, reset_dut, wait_n_cycles, sim_time_ns
+from sim_utils import start_clock, reset_dut, sim_time_ns
 from agents.spi_agent import SpiFlashModel, SpiMonitor, SpiTransaction
 from agents.cpu_monitor import CpuMonitor
 from scoreboard import Scoreboard
 from coverage import sample_spi_txn
-
-
-GOLDEN_FLASH = bytes([
-    0x6F, 0x00, 0x00, 0x00,
-    *range(4, 256)
-])
+from conftest import GOLDEN_FLASH
 
 
 @cocotb.test()

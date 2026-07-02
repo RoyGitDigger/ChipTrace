@@ -2,9 +2,9 @@
 //
 // picosoc.v exposes individual OE/DO/DI signals for each SPI IO pin
 // rather than a single inout bus. This wrapper implements the tristate
-// mux so the testbench sees a clean inout flash_io[3:0] bus, and so
-// the SPI flash model in the Python agent can drive/sample a single
-// 4-bit wire without caring about the OE logic inside the DUT.
+// mux internally to connect the DUT's signals, and exposes two unidirectional
+// buses: flash_io_do (read by Python testbench) and flash_io_di (driven by
+// Python testbench) to avoid Verilator top-level inout/tristate limitations.
 //
 // mem_valid / mem_ready / mem_addr / mem_wdata / mem_wstrb / mem_rdata
 // are module-level wires in picosoc.v (not buried inside cpu). We just
@@ -16,10 +16,11 @@ module top_tb (
     input  wire       clk,
     input  wire       resetn,
 
-    // SPI flash — exposed as inout for the Python SPI flash model
+    // SPI flash — unidirectional split to bypass Verilator top-level inout limitations
     output wire       flash_csb,
     output wire       flash_clk,
-    inout  wire [3:0] flash_io,
+    output wire [3:0] flash_io_do, // Output from DUT (driven by DUT, read by agent)
+    input  wire [3:0] flash_io_di, // Input to DUT (driven by agent, read by DUT)
 
     // UART
     output wire       ser_tx,
@@ -43,25 +44,22 @@ module top_tb (
     input  wire [31:0] iomem_rdata
 );
 
-    // Tristate mux: per-pin OE/DO from DUT, DI feeds back in
+    // Tristate/direction control from DUT
     wire flash_io0_oe, flash_io1_oe, flash_io2_oe, flash_io3_oe;
     wire flash_io0_do, flash_io1_do, flash_io2_do, flash_io3_do;
     wire flash_io0_di, flash_io1_di, flash_io2_di, flash_io3_di;
 
-    assign flash_io[0] = flash_io0_oe ? flash_io0_do : 1'bz;
-    assign flash_io[1] = flash_io1_oe ? flash_io1_do : 1'bz;
-    assign flash_io[2] = flash_io2_oe ? flash_io2_do : 1'bz;
-    assign flash_io[3] = flash_io3_oe ? flash_io3_do : 1'bz;
+    // Connect inputs driven by python agent to DUT's data-in ports
+    assign flash_io0_di = flash_io_di[0];
+    assign flash_io1_di = flash_io_di[1];
+    assign flash_io2_di = flash_io_di[2];
+    assign flash_io3_di = flash_io_di[3];
 
-    assign flash_io0_di = flash_io[0];
-    assign flash_io1_di = flash_io[1];
-    assign flash_io2_di = flash_io[2];
-    assign flash_io3_di = flash_io[3];
-
-    // Internal wires to tap picosoc's mem bus
-    wire _mem_valid, _mem_instr, _mem_ready;
-    wire [31:0] _mem_addr, _mem_wdata, _mem_rdata;
-    wire [ 3:0] _mem_wstrb;
+    // Connect outputs driven by DUT to python agent's data-out ports
+    assign flash_io_do[0] = flash_io0_do;
+    assign flash_io_do[1] = flash_io1_do;
+    assign flash_io_do[2] = flash_io2_do;
+    assign flash_io_do[3] = flash_io3_do;
 
     picosoc #(
         .MEM_WORDS(256)
