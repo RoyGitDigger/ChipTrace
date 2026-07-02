@@ -48,15 +48,19 @@ async def test_uart_loopback(dut):
     await Timer(200_000, units="ns")
 
     # Drain whatever the monitor captured and run through scoreboard
+    rx_count = 0
     while not monitor.rx_queue.empty():
         ts, got = await monitor.rx_queue.get()
         txn = UartTransaction(byte_val=got, timestamp_ns=ts, direction="tx")
         sb.check_uart_byte(txn)
         sample_uart_txn(txn)
+        rx_count += 1
 
     monitor.stop()
     cpu_mon.stop()
     flash.stop()
+
+    assert rx_count > 0, "UART loopback failed: monitor captured 0 bytes! (vacuous pass avoided)"
 
     cocotb.log.info(sb.report())
 
