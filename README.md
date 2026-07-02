@@ -43,10 +43,6 @@ Two issues here:
 
 ---
 
-
-
----
-
 ## Metrics & Benchmarks
 
 ### Simulation Timing (100MHz System Clock)
